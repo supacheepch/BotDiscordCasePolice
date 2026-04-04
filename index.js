@@ -24,6 +24,8 @@ client.on('messageCreate', async (message) => {
   try {
     if (message.author.bot) return;
     if (message.content === '!countCase') {
+      memberMap.clear();
+      await preloadMembers(message.guild);
       countCase(message);
     }
     if (message.content === '!getM') {
@@ -39,6 +41,8 @@ client.on('messageCreate', async (message) => {
 
     }
     if (message.content === "!countSelf") {
+      memberMap.clear();
+      await preloadMembers(message.guild);
       countSelf(message);
     }
   } catch (error) {
