@@ -82,9 +82,9 @@ async function countCase(message) {
       text += `${data.displayName} | Posts: ${data.posts} | Tagged: ${data.tagged} | Sum: ${data.posts + data.tagged} \n`;
     }
 
-    var sendMsg = await message.channel.send(text);
+    var sendMsg_1 = await message.channel.send(text);
     setTimeout(() => {
-      sendMsg.delete().catch(() => { });
+      sendMsg_1.delete().catch(() => { });
     }, 10000);
 
     // 🔹 export excel (optional)
