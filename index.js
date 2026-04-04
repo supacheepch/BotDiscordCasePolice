@@ -16,6 +16,9 @@ const client = new Client({
   ],
 });
 let stats = {};
+const memberMap = new Map();
+
+
 
 client.on('messageCreate', async (message) => {
 
@@ -28,6 +31,18 @@ client.on('messageCreate', async (message) => {
     // }
 
     countCase(message);
+  }
+  if (message.content === '!getM') {
+    await message.reply('⏳ กำลังโหลดรายชื่อ...');
+    let output = ''
+    memberMap.clear();
+    await preloadMembers(message.guild); // 👈 โหลดเฉพาะ server นี้
+    memberMap.forEach((data, id) => {
+      output += `${data.displayName} (${data.username})\n`;
+    });
+
+    message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
+
   }
 
 });
@@ -61,7 +76,30 @@ async function countCase(message) {
   });
 }
 
-async function loadStats(channel, client) {
+
+
+// 🔥 preload member ทั้ง server
+async function preloadMembers(guild) {
+  const members = await guild.members.fetch();
+
+  members.forEach(member => {
+    memberMap.set(member.id, {
+      displayName: member.displayName,
+      username: member.user.username
+    });
+  });
+
+  console.log(`✅ Loaded members: ${memberMap.size}`);
+}
+
+// 🔥 helper ดึงชื่อ
+function getDisplayName(userId, fallbackUsername = "Unknown User") {
+  const userData = memberMap.get(userId);
+  return userData ? userData.displayName : fallbackUsername;
+}
+
+// 🔥 main function
+async function loadStats(channel) {
   let stats = {};
   let lastId;
   let fetched;
@@ -72,7 +110,7 @@ async function loadStats(channel, client) {
       before: lastId,
     });
 
-    for (const message of fetched.values()) { // 👈 เปลี่ยนตรงนี้
+    for (const message of fetched.values()) {
       if (message.author.bot) continue;
 
       const content = message.content;
@@ -81,24 +119,10 @@ async function loadStats(channel, client) {
 
       const authorId = message.author.id;
 
-      // 🔥 ดึง displayName แบบถูกต้อง
-      let displayName;
-
-      try {
-        const member = await message.guild.members.fetch(authorId);
-        displayName = member.displayName;
-      } catch (err) {
-        if (err.code === 10007) {
-          console.log(`❌ ไม่เจอ member: ${authorId}`);
-        }
-
-        try {
-          const user = await client.users.fetch(authorId);
-          displayName = user.username;
-        } catch {
-          displayName = "Unknown User";
-        }
-      }
+      const displayName = getDisplayName(
+        authorId,
+        message.author.username
+      );
 
       // ✅ init author
       if (!stats[authorId]) {
@@ -126,15 +150,12 @@ async function loadStats(channel, client) {
 
           if (!user) continue;
 
-          let targetDisplayName;
+          const targetDisplayName = getDisplayName(
+            id,
+            user.username
+          );
 
-          try {
-            const targetMember = await message.guild.members.fetch(id);
-            targetDisplayName = targetMember.displayName;
-          } catch {
-            targetDisplayName = user.username;
-          }
-
+          // init target
           if (!stats[id]) {
             stats[id] = {
               username: user.username,
@@ -155,7 +176,6 @@ async function loadStats(channel, client) {
 
   return stats;
 }
-
 function isCommand(content) {
   return content.startsWith('!');
 }
@@ -186,6 +206,21 @@ async function exportExcel(stats) {
   await workbook.xlsx.writeFile(filePath);
 
   return filePath;
+}
+
+
+
+async function preloadMembers(guild) {
+  const members = await guild.members.fetch(); // 👈 โหลดทั้ง server
+
+  members.forEach(member => {
+    memberMap.set(member.id, {
+      displayName: member.displayName,
+      username: member.user.username
+    });
+  });
+
+  console.log(`✅ Loaded members: ${memberMap.size}`);
 }
 
 // ===== LOGIN =====
