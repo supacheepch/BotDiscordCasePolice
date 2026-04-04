@@ -40,7 +40,7 @@ client.on('messageCreate', async (message) => {
       var sendMsg = message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
       setTimeout(() => {
         sendMsg.delete().catch(() => { });
-      }, 5000);
+      }, 10000);
     }
     if (message.content === "!countSelf") {
       memberMap.clear();
@@ -52,7 +52,7 @@ client.on('messageCreate', async (message) => {
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในระบบ (messageCreate)');
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
-    }, 5000);
+    }, 10000);
   }
 });
 
@@ -78,7 +78,7 @@ async function countCase(message) {
     var sendMsg = await message.channel.send(text);
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
-    }, 5000);
+    }, 10000);
 
     // 🔹 export excel (optional)
     const filePath = await exportExcel(stats);
@@ -88,13 +88,13 @@ async function countCase(message) {
     });
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
-    }, 5000);
+    }, 10000);
   } catch (error) {
     console.error('❌ Error in countCase:', error);
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับเคส (countCase)');
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
-    }, 5000);
+    }, 10000);
   }
 }
 
@@ -298,13 +298,13 @@ async function countSelf(message) {
     );
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
-    }, 5000);
+    }, 10000);
   } catch (error) {
     console.error('❌ Error in countSelf:', error);
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับ (countqSelf)');
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
-    }, 5000);
+    }, 10000);
   }
 }
 
