@@ -39,10 +39,10 @@ client.on('messageCreate', async (message) => {
       });
 
       var sendMsg = message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
-      setTimeout(() => {
-        sendMsg.delete().catch(() => { });
-        reply.delete().catch(() => { });
-      }, 10000);
+      // setTimeout(() => {
+      //   sendMsg.delete().catch(() => { });
+      //   reply.delete().catch(() => { });
+      // }, 10000);
 
     }
     if (message.content === "!countSelf") {
@@ -53,9 +53,9 @@ client.on('messageCreate', async (message) => {
   } catch (error) {
     console.error('❌ Error in messageCreate:', error);
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในระบบ (messageCreate)');
-    setTimeout(() => {
-      sendMsg.delete().catch(() => { });
-    }, 10000);
+    // setTimeout(() => {
+    //   sendMsg.delete().catch(() => { });
+    // }, 10000);
   }
 });
 
@@ -67,9 +67,9 @@ async function countCase(message) {
     const channel = message.channel
     if (!channel) {
       var reply_error = await message.reply('❌ Channel not found');
-      setTimeout(() => {
-        reply_error.delete().catch(() => { });
-      }, 10000);
+      // setTimeout(() => {
+      //   reply_error.delete().catch(() => { });
+      // }, 10000);
       return;
     }
 
@@ -83,9 +83,9 @@ async function countCase(message) {
     }
 
     var sendMsg_1 = await message.channel.send(text);
-    setTimeout(() => {
-      sendMsg_1.delete().catch(() => { });
-    }, 10000);
+    // setTimeout(() => {
+    //   sendMsg_1.delete().catch(() => { });
+    // }, 10000);
 
     // 🔹 export excel (optional)
     const filePath = await exportExcel(stats);
@@ -93,17 +93,17 @@ async function countCase(message) {
       content: '📁 Export Excel',
       files: [filePath],
     });
-    setTimeout(() => {
-      sendMsg.delete().catch(() => { });
+    // setTimeout(() => {
+    //   sendMsg.delete().catch(() => { });
 
-    }, 10000);
+    // }, 10000);
   } catch (error) {
     console.error('❌ Error in countCase:', error);
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับเคส (countCase)');
-    setTimeout(() => {
-      sendMsg.delete().catch(() => { });
-      reply.delete().catch(() => { });
-    }, 10000);
+    // setTimeout(() => {
+    //   sendMsg.delete().catch(() => { });
+    //   reply.delete().catch(() => { });
+    // }, 10000);
   }
 }
 
@@ -305,19 +305,19 @@ async function countSelf(message) {
       `Tagged: ${stats.tagged}\n` +
       `Self Mention: ${stats.selfMention}`
     );
-    setTimeout(() => {
-      sendMsg.delete().catch(() => { });
+    // setTimeout(() => {
+    //   sendMsg.delete().catch(() => { });
 
-    }, 10000);
+    // }, 10000);
   } catch (error) {
     console.error('❌ Error in countSelf:', error);
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับ (countqSelf)');
-    setTimeout(() => {
-      sendMsg.delete().catch(() => { });
-    }, 10000);
+    // setTimeout(() => {
+    //   sendMsg.delete().catch(() => { });
+    // }, 10000);
   }
   finally {
-    reply.delete().catch(() => { });
+    // reply.delete().catch(() => { });
   }
 }
 
