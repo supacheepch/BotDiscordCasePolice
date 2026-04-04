@@ -21,194 +21,184 @@ const memberMap = new Map();
 
 
 client.on('messageCreate', async (message) => {
+  try {
+    if (message.author.bot) return;
+    if (message.content === '!countCase') {
+      countCase(message);
+    }
+    if (message.content === '!getM') {
+      await message.reply('⏳ กำลังโหลดรายชื่อ...');
+      let output = ''
+      memberMap.clear();
+      await preloadMembers(message.guild); // 👈 โหลดเฉพาะ server นี้
+      memberMap.forEach((data, id) => {
+        output += `${data.displayName} (${data.username})\n`;
+      });
 
-  if (message.author.bot) return;
-  if (message.content === '!countCase') {
-    // const name = message.member?.displayName || message.author.username;
+      message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
 
-    // if (!allowedNames.includes(name)) {
-    //   return message.reply('❌ ทำรัยวัยรุ่นรีบหรอ');
-    // }
-
-    countCase(message);
+    }
+    if (message.content === "!countSelf") {
+      countSelf(message);
+    }
+  } catch (error) {
+    console.error('❌ Error in messageCreate:', error);
+    message.channel.send('❌ เกิดข้อผิดพลาดในระบบ (messageCreate)');
   }
-  if (message.content === '!getM') {
-    await message.reply('⏳ กำลังโหลดรายชื่อ...');
-    let output = ''
-    memberMap.clear();
-    await preloadMembers(message.guild); // 👈 โหลดเฉพาะ server นี้
-    memberMap.forEach((data, id) => {
-      output += `${data.displayName} (${data.username})\n`;
-    });
-
-    message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
-
-  }
-
 });
 
 async function countCase(message) {
-  await message.reply('⏳ กำลังนับข้อมูล...');
+  try {
+    await message.reply('⏳ กำลังนับข้อมูล...');
 
-  const guild = message.guild;
-  // const channel = guild.channels.cache.get('1485010954981867710');
-  const channel = message.channel
-  if (!channel) {
-    return message.reply('❌ Channel not found');
-  }
+    const guild = message.guild;
+    const channel = message.channel
+    if (!channel) {
+      return message.reply('❌ Channel not found');
+    }
 
-  const stats = await loadStats(channel);
+    const stats = await loadStats(channel);
 
-  // 🔹 สร้างข้อความ
-  let text = '📊 **Case Summary**\n';
+    // 🔹 สร้างข้อความ
+    let text = '📊 **Case Summary**\n';
 
-  for (const [id, data] of Object.entries(stats)) {
-    text += `${data.displayName} | Posts: ${data.posts} | Tagged: ${data.tagged} | Sum: ${data.posts + data.tagged} \n`;
-  }
+    for (const [id, data] of Object.entries(stats)) {
+      text += `${data.displayName} | Posts: ${data.posts} | Tagged: ${data.tagged} | Sum: ${data.posts + data.tagged} \n`;
+    }
 
-  await message.channel.send(text);
+    await message.channel.send(text);
 
-  // 🔹 export excel (optional)
-  const filePath = await exportExcel(stats);
-  await message.channel.send({
-    content: '📁 Export Excel',
-    files: [filePath],
-  });
-}
-
-
-
-// 🔥 preload member ทั้ง server
-async function preloadMembers(guild) {
-  const members = await guild.members.fetch();
-
-  members.forEach(member => {
-    memberMap.set(member.id, {
-      displayName: member.displayName,
-      username: member.user.username
+    // 🔹 export excel (optional)
+    const filePath = await exportExcel(stats);
+    await message.channel.send({
+      content: '📁 Export Excel',
+      files: [filePath],
     });
-  });
-
-  console.log(`✅ Loaded members: ${memberMap.size}`);
+  } catch (error) {
+    console.error('❌ Error in countCase:', error);
+    message.channel.send('❌ เกิดข้อผิดพลาดในการนับเคส (countCase)');
+  }
 }
 
-// 🔥 helper ดึงชื่อ
-function getDisplayName(userId, fallbackUsername = "Unknown User") {
-  const userData = memberMap.get(userId);
-  return userData ? userData.displayName : fallbackUsername;
-}
+
 
 // 🔥 main function
 async function loadStats(channel) {
-  let stats = {};
-  let lastId;
-  let fetched;
+  try {
+    let stats = {};
+    let lastId;
+    let fetched;
 
-  do {
-    fetched = await channel.messages.fetch({
-      limit: 100,
-      before: lastId,
-    });
+    do {
+      fetched = await channel.messages.fetch({
+        limit: 100,
+        before: lastId,
+      });
 
-    for (const message of fetched.values()) {
-      if (message.author.bot) continue;
+      for (const message of fetched.values()) {
+        if (message.author.bot) continue;
 
-      const content = message.content;
+        const content = message.content;
 
-      if (isCommand(content)) continue;
+        if (isCommand(content)) continue;
 
-      const authorId = message.author.id;
+        const authorId = message.author.id;
 
-      const displayName = getDisplayName(
-        authorId,
-        message.author.username
-      );
+        const displayName = getDisplayName(
+          authorId,
+          message.author.username
+        );
 
-      // ✅ init author
-      if (!stats[authorId]) {
-        stats[authorId] = {
-          username: message.author.username,
-          displayName: displayName,
-          posts: 0,
-          tagged: 0
-        };
-      }
+        // ✅ init author
+        if (!stats[authorId]) {
+          stats[authorId] = {
+            username: message.author.username,
+            displayName: displayName,
+            posts: 0,
+            tagged: 0
+          };
+        }
 
-      // ✅ ตรวจ post
-      const mentionTags = content.match(/<@!?(\d+)>/g);
-      const hasAttachment = message.attachments.size > 0;
+        // ✅ ตรวจ post
+        const mentionTags = content.match(/<@!?(\d+)>/g);
+        const hasAttachment = message.attachments.size > 0;
 
-      if (mentionTags || hasAttachment) {
-        stats[authorId].posts++;
-      }
+        if (mentionTags || hasAttachment) {
+          stats[authorId].posts++;
+        }
 
-      // ✅ นับคนโดนแท็ก
-      if (mentionTags) {
-        for (const match of mentionTags) {
-          const id = match.replace(/<@!?/, '').replace('>', '');
-          const user = message.mentions.users.get(id);
+        // ✅ นับคนโดนแท็ก
+        if (mentionTags) {
+          for (const match of mentionTags) {
+            const id = match.replace(/<@!?/, '').replace('>', '');
+            const user = message.mentions.users.get(id);
 
-          if (!user) continue;
+            if (!user) continue;
 
-          const targetDisplayName = getDisplayName(
-            id,
-            user.username
-          );
+            const targetDisplayName = getDisplayName(
+              id,
+              user.username
+            );
 
-          // init target
-          if (!stats[id]) {
-            stats[id] = {
-              username: user.username,
-              displayName: targetDisplayName,
-              posts: 0,
-              tagged: 0
-            };
+            // init target
+            if (!stats[id]) {
+              stats[id] = {
+                username: user.username,
+                displayName: targetDisplayName,
+                posts: 0,
+                tagged: 0
+              };
+            }
+
+            stats[id].tagged++;
           }
-
-          stats[id].tagged++;
         }
       }
-    }
 
-    lastId = fetched.last()?.id;
+      lastId = fetched.last()?.id;
 
-  } while (fetched.size === 100);
+    } while (fetched.size === 100);
 
-  return stats;
+    return stats;
+  } catch (error) {
+    console.error('❌ Error in loadStats:', error);
+    throw error; // throw data to handler
+  }
 }
-function isCommand(content) {
-  return content.startsWith('!');
-}
+
 
 async function exportExcel(stats) {
-  const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Report');
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet('Report');
 
-  sheet.columns = [
-    { header: 'Name', key: 'name', width: 25 },
-    { header: 'Posts', key: 'posts', width: 10 },
-    { header: 'Tagged', key: 'tagged', width: 10 },
-    { header: 'Total', key: 'total', width: 10 },
-  ];
+    sheet.columns = [
+      { header: 'Name', key: 'name', width: 25 },
+      { header: 'Posts', key: 'posts', width: 10 },
+      { header: 'Tagged', key: 'tagged', width: 10 },
+      { header: 'Total', key: 'total', width: 10 },
+    ];
 
-  for (const id in stats) {
-    const data = stats[id];
+    for (const id in stats) {
+      const data = stats[id];
 
-    sheet.addRow({
-      name: data.displayName, // ✅ ใช้ชื่อแสดงผล
-      posts: data.posts,
-      tagged: data.tagged,
-      total: data.posts + data.tagged,
-    });
+      sheet.addRow({
+        name: data.displayName, // ✅ ใช้ชื่อแสดงผล
+        posts: data.posts,
+        tagged: data.tagged,
+        total: data.posts + data.tagged,
+      });
+    }
+
+    const filePath = './report.xlsx';
+    await workbook.xlsx.writeFile(filePath);
+
+    return filePath;
+  } catch (error) {
+    console.error('❌ Error in exportExcel:', error);
+    throw error;
   }
-
-  const filePath = './report.xlsx';
-  await workbook.xlsx.writeFile(filePath);
-
-  return filePath;
 }
-
-
 
 async function preloadMembers(guild) {
   const members = await guild.members.fetch(); // 👈 โหลดทั้ง server
@@ -222,6 +212,91 @@ async function preloadMembers(guild) {
 
   console.log(`✅ Loaded members: ${memberMap.size}`);
 }
+
+async function countSelf(message) {
+  try {
+    await message.reply('⏳ กำลังนับข้อมูล...');
+    const userId = message.author.id;
+
+    const displayName = getDisplayName(
+      userId,
+      message.author.username
+    );
+    let stats = {
+      displayName: displayName,
+      posts: 0,
+      tagged: 0,
+      selfMention: 0
+    };
+
+    let lastId;
+    let fetched;
+
+    do {
+      fetched = await message.channel.messages.fetch({
+        limit: 100,
+        before: lastId,
+      });
+
+      for (const msg of fetched.values()) {
+
+        // 🔥 นับเฉพาะข้อความของ "เรา" (self post)
+        if (msg.author.id === userId) {
+          const hasAttachment = msg.attachments.size > 0;
+          const mentionTags = msg.content.match(/<@!?(\d+)>/g);
+
+          // ✅ เราโพสต์ + มีรูป
+          if (hasAttachment) {
+            stats.posts++;
+          }
+
+          // (optional) ถ้าจะนับโพสต์ที่มี mention ด้วย
+          // if (mentionTags) { ... }
+        }
+
+        // 🔥 นับคนอื่นที่ tag เรา
+        const mentionTags = msg.content.match(/<@!?(\d+)>/g);
+
+        if (mentionTags) {
+          for (const tag of mentionTags) {
+            const id = tag.replace(/<@!?/, "").replace(">", "");
+
+            if (id === userId) {
+              stats.tagged++;
+            }
+          }
+        }
+      }
+
+      lastId = fetched.last()?.id;
+
+    } while (fetched.size === 100);
+
+    await message.channel.send(
+      `📊 Case Self Report ${displayName}\n` +
+      `Posts: ${stats.posts}\n` +
+      `Tagged: ${stats.tagged}\n` +
+      `Self Mention: ${stats.selfMention}`
+    );
+  } catch (error) {
+    console.error('❌ Error in countSelf:', error);
+    message.channel.send('❌ เกิดข้อผิดพลาดในการนับ (countSelf)');
+  }
+}
+
+// 🔥 helper ดึงชื่อ
+function getDisplayName(userId, fallbackUsername = "Unknown User") {
+  const userData = memberMap.get(userId);
+  return userData ? userData.displayName : fallbackUsername;
+}
+function isCommand(content) {
+  return content.startsWith('!');
+}
+// ===== ERROR HANDLING =====
+client.on('error', console.error);
+process.on('unhandledRejection', error => {
+  console.error('Unhandled promise rejection:', error);
+});
 
 // ===== LOGIN =====
 client.login(TOKEN);
