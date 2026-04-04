@@ -153,6 +153,7 @@ async function exportExcel(stats) {
     { header: 'Name', key: 'name', width: 25 },
     { header: 'Posts', key: 'posts', width: 10 },
     { header: 'Tagged', key: 'tagged', width: 10 },
+    { header: 'Total', key: 'total', width: 10 },
   ];
 
   for (const id in stats) {
@@ -162,6 +163,7 @@ async function exportExcel(stats) {
       name: data.displayName, // ✅ ใช้ชื่อแสดงผล
       posts: data.posts,
       tagged: data.tagged,
+      total: data.posts + data.tagged,
     });
   }
 
