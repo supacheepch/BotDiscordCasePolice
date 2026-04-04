@@ -1,4 +1,4 @@
-const os = require("os");
+
 const { Client, GatewayIntentBits } = require('discord.js');
 const ExcelJS = require('exceljs');
 require('dotenv').config();
@@ -17,44 +17,9 @@ const client = new Client({
 });
 let stats = {};
 
-// ===== CREATE IP location =====
-
-// 🔍 ดึง public IP
-function getIP() {
-  return new Promise((resolve) => {
-    https.get("https://api.ipify.org?format=json", (res) => {
-      let data = "";
-      res.on("data", chunk => data += chunk);
-      res.on("end", () => {
-        try {
-          resolve(JSON.parse(data).ip);
-        } catch {
-          resolve("unknown");
-        }
-      });
-    }).on("error", () => resolve("unknown"));
-  });
-}
-
-// 🔥 รวมข้อมูล runtime
-async function getInfo() {
-  const ip = await getIP();
-
-  return {
-    hostname: os.hostname(),
-    platform: os.platform(),
-    env: process.env.RAILWAY_ENVIRONMENT || "local",
-    service: process.env.RAILWAY_SERVICE_NAME || "none",
-    ip: ip,
-    time: new Date().toLocaleString()
-  };
-}
-
 client.on('messageCreate', async (message) => {
 
   if (message.author.bot) return;
-  const info = await getInfo();
-  await message.channel.send(info);
   if (message.content === '!countCase') {
     // const name = message.member?.displayName || message.author.username;
 
@@ -83,7 +48,7 @@ async function countCase(message) {
   let text = '📊 **Case Summary**\n';
 
   for (const [id, data] of Object.entries(stats)) {
-    text += `- ${data.displayName} | Posts: ${data.posts} | Tagged: ${data.tagged}\n | Sum: ${data.posts + data.tagged} \n`;
+    text += `${data.displayName} | Posts: ${data.posts} | Tagged: ${data.tagged} | Sum: ${data.posts + data.tagged} \n`;
   }
 
   await message.channel.send(text);
@@ -96,7 +61,7 @@ async function countCase(message) {
   });
 }
 
-async function loadStats(channel) {
+async function loadStats(channel, client) {
   let stats = {};
   let lastId;
   let fetched;
@@ -107,20 +72,33 @@ async function loadStats(channel) {
       before: lastId,
     });
 
-    fetched.forEach((message) => {
-      if (message.author.bot) return;
+    for (const message of fetched.values()) { // 👈 เปลี่ยนตรงนี้
+      if (message.author.bot) continue;
 
       const content = message.content;
 
-      // ❌ ข้าม command
-      if (isCommand(content)) return;
+      if (isCommand(content)) continue;
 
       const authorId = message.author.id;
 
-      // ดึง member (เพื่อใช้ displayName)
-      // const member = message.guild.members.cache.get(authorId);
-      const member = message.guild.members.cache.get(authorId);
-      const displayName = member?.displayName || message.author.username;
+      // 🔥 ดึง displayName แบบถูกต้อง
+      let displayName;
+
+      try {
+        const member = await message.guild.members.fetch(authorId);
+        displayName = member.displayName;
+      } catch (err) {
+        if (err.code === 10007) {
+          console.log(`❌ ไม่เจอ member: ${authorId}`);
+        }
+
+        try {
+          const user = await client.users.fetch(authorId);
+          displayName = user.username;
+        } catch {
+          displayName = "Unknown User";
+        }
+      }
 
       // ✅ init author
       if (!stats[authorId]) {
@@ -132,7 +110,7 @@ async function loadStats(channel) {
         };
       }
 
-      // ✅ ตรวจ mention / attachment
+      // ✅ ตรวจ post
       const mentionTags = content.match(/<@!?(\d+)>/g);
       const hasAttachment = message.attachments.size > 0;
 
@@ -142,30 +120,34 @@ async function loadStats(channel) {
 
       // ✅ นับคนโดนแท็ก
       if (mentionTags) {
-        mentionTags.forEach((match) => {
+        for (const match of mentionTags) {
           const id = match.replace(/<@!?/, '').replace('>', '');
           const user = message.mentions.users.get(id);
 
-          if (user) {
-            const targetMember = message.guild.members.cache.get(id);
-            const targetDisplayName =
-              targetMember?.displayName || user.username;
+          if (!user) continue;
 
-            // init target
-            if (!stats[id]) {
-              stats[id] = {
-                username: user.username,
-                displayName: targetDisplayName,
-                posts: 0,
-                tagged: 0
-              };
-            }
+          let targetDisplayName;
 
-            stats[id].tagged++;
+          try {
+            const targetMember = await message.guild.members.fetch(id);
+            targetDisplayName = targetMember.displayName;
+          } catch {
+            targetDisplayName = user.username;
           }
-        });
+
+          if (!stats[id]) {
+            stats[id] = {
+              username: user.username,
+              displayName: targetDisplayName,
+              posts: 0,
+              tagged: 0
+            };
+          }
+
+          stats[id].tagged++;
+        }
       }
-    });
+    }
 
     lastId = fetched.last()?.id;
 
