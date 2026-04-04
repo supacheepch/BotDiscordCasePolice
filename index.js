@@ -37,8 +37,10 @@ client.on('messageCreate', async (message) => {
         output += `${data.displayName} (${data.username})\n`;
       });
 
-      message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
-
+      var sendMsg = message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
+      setTimeout(() => {
+        sendMsg.delete().catch(() => { });
+      }, 5000);
     }
     if (message.content === "!countSelf") {
       memberMap.clear();
@@ -47,7 +49,10 @@ client.on('messageCreate', async (message) => {
     }
   } catch (error) {
     console.error('❌ Error in messageCreate:', error);
-    message.channel.send('❌ เกิดข้อผิดพลาดในระบบ (messageCreate)');
+    var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในระบบ (messageCreate)');
+    setTimeout(() => {
+      sendMsg.delete().catch(() => { });
+    }, 5000);
   }
 });
 
@@ -70,17 +75,26 @@ async function countCase(message) {
       text += `${data.displayName} | Posts: ${data.posts} | Tagged: ${data.tagged} | Sum: ${data.posts + data.tagged} \n`;
     }
 
-    await message.channel.send(text);
+    var sendMsg = await message.channel.send(text);
+    setTimeout(() => {
+      sendMsg.delete().catch(() => { });
+    }, 5000);
 
     // 🔹 export excel (optional)
     const filePath = await exportExcel(stats);
-    await message.channel.send({
+    var sendMsg = await message.channel.send({
       content: '📁 Export Excel',
       files: [filePath],
     });
+    setTimeout(() => {
+      sendMsg.delete().catch(() => { });
+    }, 5000);
   } catch (error) {
     console.error('❌ Error in countCase:', error);
-    message.channel.send('❌ เกิดข้อผิดพลาดในการนับเคส (countCase)');
+    var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับเคส (countCase)');
+    setTimeout(() => {
+      sendMsg.delete().catch(() => { });
+    }, 5000);
   }
 }
 
@@ -276,15 +290,21 @@ async function countSelf(message) {
 
     } while (fetched.size === 100);
 
-    await message.channel.send(
+    var sendMsg = await message.channel.send(
       `📊 Case Self Report ${displayName}\n` +
       `Posts: ${stats.posts}\n` +
       `Tagged: ${stats.tagged}\n` +
       `Self Mention: ${stats.selfMention}`
     );
+    setTimeout(() => {
+      sendMsg.delete().catch(() => { });
+    }, 5000);
   } catch (error) {
     console.error('❌ Error in countSelf:', error);
-    message.channel.send('❌ เกิดข้อผิดพลาดในการนับ (countSelf)');
+    var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับ (countqSelf)');
+    setTimeout(() => {
+      sendMsg.delete().catch(() => { });
+    }, 5000);
   }
 }
 
