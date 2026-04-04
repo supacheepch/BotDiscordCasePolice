@@ -1,9 +1,8 @@
+const os = require("os");
 const { Client, GatewayIntentBits } = require('discord.js');
 const ExcelJS = require('exceljs');
 require('dotenv').config();
 // ===== CONFIG =====
-
-
 const TOKEN = process.env.DISCORD_TOKEN;
 
 const allowedNames = ['BaeJu', 'CasePolice', 'Boss'];
@@ -18,10 +17,44 @@ const client = new Client({
 });
 let stats = {};
 
+// ===== CREATE IP location =====
+
+// 🔍 ดึง public IP
+function getIP() {
+  return new Promise((resolve) => {
+    https.get("https://api.ipify.org?format=json", (res) => {
+      let data = "";
+      res.on("data", chunk => data += chunk);
+      res.on("end", () => {
+        try {
+          resolve(JSON.parse(data).ip);
+        } catch {
+          resolve("unknown");
+        }
+      });
+    }).on("error", () => resolve("unknown"));
+  });
+}
+
+// 🔥 รวมข้อมูล runtime
+async function getInfo() {
+  const ip = await getIP();
+
+  return {
+    hostname: os.hostname(),
+    platform: os.platform(),
+    env: process.env.RAILWAY_ENVIRONMENT || "local",
+    service: process.env.RAILWAY_SERVICE_NAME || "none",
+    ip: ip,
+    time: new Date().toLocaleString()
+  };
+}
 
 client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
 
+  if (message.author.bot) return;
+  const info = await getInfo();
+  await message.channel.send(info);
   if (message.content === '!countCase') {
     // const name = message.member?.displayName || message.author.username;
 
