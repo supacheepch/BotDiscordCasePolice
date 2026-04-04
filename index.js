@@ -16,7 +16,7 @@ const client = new Client({
     GatewayIntentBits.GuildMembers,
   ],
 });
-let stats = {}; // ✅ ต้องมีตัวนี้
+let stats = {};
 
 
 client.on('messageCreate', async (message) => {
