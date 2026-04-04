@@ -29,7 +29,8 @@ client.on('messageCreate', async (message) => {
       countCase(message);
     }
     if (message.content === '!getM') {
-      await message.reply('⏳ กำลังโหลดรายชื่อ...');
+      var reply = await message.reply('⏳ กำลังโหลดรายชื่อ...');
+
       let output = ''
       memberMap.clear();
       await preloadMembers(message.guild); // 👈 โหลดเฉพาะ server นี้
@@ -40,7 +41,9 @@ client.on('messageCreate', async (message) => {
       var sendMsg = message.channel.send(output.slice(0, 2000)); // 👈 กันเกิน limit Discord
       setTimeout(() => {
         sendMsg.delete().catch(() => { });
+        reply.delete().catch(() => { });
       }, 10000);
+
     }
     if (message.content === "!countSelf") {
       memberMap.clear();
@@ -58,12 +61,16 @@ client.on('messageCreate', async (message) => {
 
 async function countCase(message) {
   try {
-    await message.reply('⏳ กำลังนับข้อมูล...');
+    var reply = await message.reply('⏳ กำลังนับข้อมูล...');
 
     const guild = message.guild;
     const channel = message.channel
     if (!channel) {
-      return message.reply('❌ Channel not found');
+      var reply_error = await message.reply('❌ Channel not found');
+      setTimeout(() => {
+        reply_error.delete().catch(() => { });
+      }, 10000);
+      return;
     }
 
     const stats = await loadStats(channel);
@@ -88,12 +95,14 @@ async function countCase(message) {
     });
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
+
     }, 10000);
   } catch (error) {
     console.error('❌ Error in countCase:', error);
     var sendMsg = message.channel.send('❌ เกิดข้อผิดพลาดในการนับเคส (countCase)');
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
+      reply.delete().catch(() => { });
     }, 10000);
   }
 }
@@ -233,7 +242,7 @@ async function preloadMembers(guild) {
 
 async function countSelf(message) {
   try {
-    await message.reply('⏳ กำลังนับข้อมูล...');
+    var reply = await message.reply('⏳ กำลังนับข้อมูล...');
     const userId = message.author.id;
 
     const displayName = getDisplayName(
@@ -298,6 +307,7 @@ async function countSelf(message) {
     );
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
+
     }, 10000);
   } catch (error) {
     console.error('❌ Error in countSelf:', error);
@@ -305,6 +315,9 @@ async function countSelf(message) {
     setTimeout(() => {
       sendMsg.delete().catch(() => { });
     }, 10000);
+  }
+  finally {
+    reply.delete().catch(() => { });
   }
 }
 
