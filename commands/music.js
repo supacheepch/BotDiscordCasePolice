@@ -167,10 +167,10 @@ async function playStream(guildId, song) {
       }
 
       const ytdlxOptions = {
-        dumpJson: true,
         format: 'bestaudio',
         noWarnings: true,
         noCheckCertificate: true,
+        output: '-',   // pipe audio to stdout
       };
 
       // ถ้ามี cookies.txt ให้แนบไปด้วยเพื่อแก้ปัญหา YouTube Block
@@ -182,12 +182,15 @@ async function playStream(guildId, song) {
         console.error('❌ No cookies.txt found! YouTube will block this request.');
       }
 
-      const output = await ytdlx(song.url, ytdlxOptions);
+      // Pipe yt-dlp stdout โดยตรงแทนการส่ง URL ให้ FFmpeg (ป้องกัน YouTube reject)
+      const ytdlxProc = ytdlx.exec(song.url, ytdlxOptions);
 
-      if (!output || !output.url) throw new Error('yt-dlp could not find extracted URL');
+      if (!ytdlxProc.stdout) throw new Error('yt-dlp process has no stdout');
 
-      console.log('✅ URL extracted via youtube-dl-exec. Starting playback...');
-      resource = createAudioResource(output.url, { inputType: StreamType.Arbitrary });
+      console.log('✅ Streaming via yt-dlp stdout...');
+      resource = createAudioResource(ytdlxProc.stdout, {
+        inputType: StreamType.Arbitrary,
+      });
 
     } catch (ytdlxError) {
       console.error('⚠️ youtube-dl-exec failed:', ytdlxError.message);
