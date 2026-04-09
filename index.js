@@ -502,12 +502,14 @@ async function playStream(guildId, song) {
     serverQueue.player.removeAllListeners('error');
     serverQueue.player.on('error', error => {
       console.error(`❌ Audio Player Error: ${error.message}`);
+      serverQueue.textChannel.send(`❌ เกิดข้อผิดพลาดขณะเล่นเพลง: **${song.title}** (${error.message})`);
       serverQueue.songs.shift();
       playStream(guildId, serverQueue.songs[0]);
     });
 
   } catch (err) {
     console.error('❌ Final Error playing stream:', err.message);
+    serverQueue.textChannel.send(`❌ ไม่สามารถเล่นเพลงได้: **${song.title}**\nสาเหตุ: ${err.message}`);
     serverQueue.songs.shift();
     playStream(guildId, serverQueue.songs[0]);
   }
