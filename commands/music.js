@@ -134,13 +134,28 @@ async function playStream(guildId, song) {
       }
       console.log('⏳ Trying youtube-dl-exec (yt-dlp)...');
 
-      const ytdlx = require('youtube-dl-exec');
+      // ใช้ system yt-dlp ถ้ามี ไม่งั้นใช้ bundle ของ package
+      const { create: createYoutubeDl } = require('youtube-dl-exec');
+      let ytdlx;
+      try {
+        // ลองใช้ system yt-dlp ก่อน (ติดตั้งโดย `apt install yt-dlp` หรือ pip)
+        const { execSync } = require('child_process');
+        execSync('yt-dlp --version', { stdio: 'ignore' });
+        ytdlx = createYoutubeDl('yt-dlp'); // ใช้ system binary
+        console.log('🔧 Using system yt-dlp binary');
+      } catch {
+        ytdlx = require('youtube-dl-exec'); // fallback to bundled
+        console.log('🔧 Using bundled yt-dlp binary');
+      }
+
       const ytdlxOptions = {
         dumpJson: true,
         format: 'bestaudio',
         noWarnings: true,
         callHome: false,
         noCheckCertificate: true,
+        // ลด rate limit โดย add delay ระหว่าง requests
+        sleepRequests: 1,
       };
 
       // ถ้ามี cookies.txt ให้แนบไปด้วยเพื่อแก้ปัญหา YouTube Block
