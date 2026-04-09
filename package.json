@@ -20,6 +20,9 @@
     "ffmpeg-static": "^5.3.0",
     "libsodium-wrappers": "^0.8.2",
     "nodemon": "^3.1.14",
-    "play-dl": "^1.9.7"
+    "play-dl": "^1.9.7",
+    "youtube-dl-exec": "^3.1.4",
+    "youtube-ext": "^1.1.25",
+    "yt-search": "^2.13.1"
   }
 }
