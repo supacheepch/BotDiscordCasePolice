@@ -18,8 +18,17 @@ const COOKIES_PATH = path.join(process.cwd(), 'cookies.txt');
 
 // ถ้ามี ENV var YOUTUBE_COOKIES ให้เขียนเป็นไฟล์อัตโนมัติ (สำหรับ Railway/Cloud hosting)
 if (!fs.existsSync(COOKIES_PATH) && process.env.YOUTUBE_COOKIES) {
-  fs.writeFileSync(COOKIES_PATH, process.env.YOUTUBE_COOKIES, 'utf-8');
-  console.log('🍪 cookies.txt created from YOUTUBE_COOKIES environment variable');
+  // Clean up: normalize line endings, remove extra blank lines
+  const cleaned = process.env.YOUTUBE_COOKIES
+    .replace(/\r\n/g, '\n')   // normalize Windows CRLF → LF
+    .replace(/\r/g, '\n')     // normalize old Mac CR → LF
+    .split('\n')
+    .filter(line => line.trim() !== '' || line.startsWith('#'))  // ลบบรรทัดว่าง ยกเว้น comment
+    .join('\n')
+    .trim() + '\n';           // ให้มี newline ท้ายไฟล์เสมอ
+
+  fs.writeFileSync(COOKIES_PATH, cleaned, 'utf-8');
+  console.log(`🍪 cookies.txt created from env var (${cleaned.length} bytes, ${cleaned.split('\n').length} lines)`);
 }
 
 const hasCookies = fs.existsSync(COOKIES_PATH);
@@ -161,13 +170,16 @@ async function playStream(guildId, song) {
         dumpJson: true,
         format: 'bestaudio',
         noWarnings: true,
-        callHome: false,
         noCheckCertificate: true,
       };
 
       // ถ้ามี cookies.txt ให้แนบไปด้วยเพื่อแก้ปัญหา YouTube Block
       if (hasCookies) {
         ytdlxOptions.cookies = COOKIES_PATH;
+        const cookieSize = fs.statSync(COOKIES_PATH).size;
+        console.log(`🍪 Passing cookies.txt (${cookieSize} bytes) to yt-dlp`);
+      } else {
+        console.error('❌ No cookies.txt found! YouTube will block this request.');
       }
 
       const output = await ytdlx(song.url, ytdlxOptions);
