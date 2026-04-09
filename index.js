@@ -1,5 +1,8 @@
 
-const { Client, GatewayIntentBits } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus, getVoiceConnection, StreamType } = require('@discordjs/voice');
+const play = require('play-dl');
+const ytdl = require('@distube/ytdl-core');
 const ExcelJS = require('exceljs');
 require('dotenv').config();
 // ===== CONFIG =====
@@ -13,10 +16,15 @@ const client = new Client({
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 let stats = {};
 const memberMap = new Map();
+const queue = new Map(); // Music queue map: guildId -> { textChannel, voiceChannel, connection, songs, player, playing }
+
+// Disable yt-dlp in play-dl to avoid path issues on Windows if needed
+// (Removed as it caused a crash, fallback logic is already implemented)
 
 
 
@@ -49,6 +57,18 @@ client.on('messageCreate', async (message) => {
       memberMap.clear();
       await preloadMembers(message.guild);
       countSelf(message);
+    }
+
+    // ===== MUSIC COMMANDS =====
+    const args = message.content.split(' ');
+    const command = args[0];
+
+    if (command === '!play') {
+      handlePlay(message, args);
+    } else if (command === '!skip') {
+      handleSkip(message);
+    } else if (command === '!leave') {
+      handleLeave(message);
     }
   } catch (error) {
     console.error('❌ Error in messageCreate:', error);
@@ -319,6 +339,201 @@ async function countSelf(message) {
   finally {
     // reply.delete().catch(() => { });
   }
+}
+
+// ===== MUSIC LOGIC =====
+
+async function handlePlay(message, args) {
+  const voiceChannel = message.member.voice.channel;
+  if (!voiceChannel) return message.reply('❌ คุณต้องอยู่ในห้องพูดคุยก่อน!');
+
+  const permissions = voiceChannel.permissionsFor(message.client.user);
+  if (!permissions.has('Connect') || !permissions.has('Speak')) {
+    return message.reply('❌ ฉันไม่มีสิทธิ์ในการเข้าหรือพูดในห้องนี้!');
+  }
+
+  const query = args.slice(1).join(' ');
+  if (!query) return message.reply('❌ โปรดใส่ชื่อเพลงหรือลิงก์!');
+
+  let serverQueue = queue.get(message.guild.id);
+
+  let song = null;
+  try {
+    const validation = await play.yt_validate(query);
+    console.log(`🔍 Validation result: ${validation}`);
+
+    if (validation === 'video') {
+      const info = await play.video_info(query);
+      song = {
+        title: info.video_details.title,
+        url: info.video_details.url || info.video_details.link
+      };
+    } else {
+      const res = await play.search(query, { limit: 1 });
+      if (!res || res.length === 0) return message.reply('❌ ไม่พบเพลงที่ต้องการ');
+      song = {
+        title: res[0].title,
+        url: res[0].url || res[0].link
+      };
+    }
+  } catch (err) {
+    console.error('❌ Error fetching song info:', err);
+    return message.reply('❌ เกิดข้อผิดพลาดในการหาเพลง');
+  }
+
+  if (!song || !song.url) {
+    console.error('❌ Song URL is undefined:', song);
+    return message.reply('❌ ไม่พบ URL สำหรับเพลงนี้');
+  }
+
+  console.log('✅ Found song:', song);
+
+  if (!serverQueue) {
+    const queueContruct = {
+      textChannel: message.channel,
+      voiceChannel: voiceChannel,
+      connection: null,
+      songs: [],
+      player: createAudioPlayer(),
+      playing: true,
+    };
+
+    queue.set(message.guild.id, queueContruct);
+    queueContruct.songs.push(song);
+
+    try {
+      const connection = joinVoiceChannel({
+        channelId: voiceChannel.id,
+        guildId: message.guild.id,
+        adapterCreator: message.guild.voiceAdapterCreator,
+      });
+
+      queueContruct.connection = connection;
+
+      connection.on(VoiceConnectionStatus.Ready, () => {
+        console.log('✅ Voice connection is ready!');
+        playStream(message.guild.id, queueContruct.songs[0]);
+      });
+
+      connection.on('error', (err) => {
+        console.error('❌ Voice connection error:', err);
+      });
+
+      message.channel.send(`🎶 เริ่มเล่นเพลง: **${song.title}**`);
+    } catch (err) {
+      console.error(err);
+      queue.delete(message.guild.id);
+      return message.channel.send(`❌ ไม่สามารถเข้าห้องเพลงได้: ${err.message}`);
+    }
+  } else {
+    serverQueue.songs.push(song);
+    return message.channel.send(`✅ เพิ่มเพลง **${song.title}** เข้าคิวแล้ว!`);
+  }
+}
+
+async function playStream(guildId, song) {
+  const serverQueue = queue.get(guildId);
+  if (!song || !song.url) {
+    console.log('🏁 No more songs or invalid song object.');
+    // wait a bit before leaving if no more songs
+    setTimeout(() => {
+      const q = queue.get(guildId);
+      if (q && q.songs.length === 0) {
+        if (q.connection) q.connection.destroy();
+        queue.delete(guildId);
+      }
+    }, 30000); // 30 seconds idle
+    return;
+  }
+
+  try {
+    console.log(`🔍 Playing stream: ${song.title} (${song.url})`);
+
+    let resource;
+    try {
+      // Try play-dl with discordPlayer optimization
+      const stream = await play.stream(song.url, {
+        quality: 2,
+        discordPlayer: true,
+        extractorArgs: {
+          youtube: {
+            player_client: ["IOS", "ANDROID", "WEB"]
+          }
+        }
+      });
+      resource = createAudioResource(stream.stream, {
+        inputType: stream.type,
+      });
+    } catch (playDlError) {
+      console.error('⚠️ play-dl failed, trying ytdl-core fallback...', playDlError.message);
+
+      // 🔥 fallback ยังใช้ได้ (บางเคส)
+      const info = await ytdl.getInfo(song.url);
+      const format = ytdl.chooseFormat(info.formats, {
+        quality: 'highestaudio',
+        filter: 'audioonly'
+      });
+
+      if (!format || !format.url) {
+        throw new Error('Failed to find any playable audio formats');
+      }
+
+      resource = createAudioResource(format.url, {
+        inputType: StreamType.Arbitrary,
+      });
+    }
+
+    serverQueue.player.play(resource);
+    serverQueue.connection.subscribe(serverQueue.player);
+
+    console.log('▶️ Audio player started.');
+
+    // Remove old listeners to avoid memory leaks and skipped songs
+    serverQueue.player.removeAllListeners(AudioPlayerStatus.Idle);
+    serverQueue.player.on(AudioPlayerStatus.Idle, () => {
+      console.log('🏁 Song finished.');
+      serverQueue.songs.shift();
+      playStream(guildId, serverQueue.songs[0]);
+    });
+
+    serverQueue.player.removeAllListeners('error');
+    serverQueue.player.on('error', error => {
+      console.error(`❌ Audio Player Error: ${error.message}`);
+      serverQueue.songs.shift();
+      playStream(guildId, serverQueue.songs[0]);
+    });
+
+  } catch (err) {
+    console.error('❌ Final Error playing stream:', err.message);
+    serverQueue.songs.shift();
+    playStream(guildId, serverQueue.songs[0]);
+  }
+}
+
+function handleSkip(message) {
+  const serverQueue = queue.get(message.guild.id);
+  if (!message.member.voice.channel) return message.reply('❌ คุณต้องอยู่ในห้องพูดคุยเพื่อข้ามเพลง!');
+  if (!serverQueue) return message.reply('❌ ไม่มีเพลงที่จะข้าม!');
+
+  serverQueue.player.stop();
+  message.channel.send('⏭ ข้ามเพลงแล้ว!');
+}
+
+function handleLeave(message) {
+  const serverQueue = queue.get(message.guild.id);
+  if (!message.member.voice.channel) return message.reply('❌ คุณต้องอยู่ในห้องพูดคุยเพื่อให้ฉันออก!');
+
+  if (serverQueue) {
+    serverQueue.songs = [];
+    serverQueue.player.stop();
+    if (serverQueue.connection) serverQueue.connection.destroy();
+    queue.delete(message.guild.id);
+  } else {
+    const connection = getVoiceConnection(message.guild.id);
+    if (connection) connection.destroy();
+  }
+
+  message.channel.send('👋 บ๊ายบาย! ออกจากห้องแล้ว');
 }
 
 // 🔥 helper ดึงชื่อ
