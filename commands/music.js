@@ -13,7 +13,8 @@ const ytdl = require('@distube/ytdl-core');
 const fs = require('fs');
 const path = require('path');
 
-const COOKIES_PATH = path.join(__dirname, '../cookies.txt');
+// ใช้ process.cwd() เพื่อให้ทำงานถูกต้องทั้งบน local และ Docker/Railway
+const COOKIES_PATH = path.join(process.cwd(), 'cookies.txt');
 
 // ถ้ามี ENV var YOUTUBE_COOKIES ให้เขียนเป็นไฟล์อัตโนมัติ (สำหรับ Railway/Cloud hosting)
 if (!fs.existsSync(COOKIES_PATH) && process.env.YOUTUBE_COOKIES) {
@@ -22,6 +23,7 @@ if (!fs.existsSync(COOKIES_PATH) && process.env.YOUTUBE_COOKIES) {
 }
 
 const hasCookies = fs.existsSync(COOKIES_PATH);
+console.log(`[Music] cookies.txt path: ${COOKIES_PATH} | exists: ${hasCookies}`);
 
 const queue = new Map();
 
@@ -161,8 +163,6 @@ async function playStream(guildId, song) {
         noWarnings: true,
         callHome: false,
         noCheckCertificate: true,
-        // ลด rate limit โดย add delay ระหว่าง requests
-        sleepRequests: 1,
       };
 
       // ถ้ามี cookies.txt ให้แนบไปด้วยเพื่อแก้ปัญหา YouTube Block
