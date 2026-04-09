@@ -14,6 +14,13 @@ const fs = require('fs');
 const path = require('path');
 
 const COOKIES_PATH = path.join(__dirname, '../cookies.txt');
+
+// ถ้ามี ENV var YOUTUBE_COOKIES ให้เขียนเป็นไฟล์อัตโนมัติ (สำหรับ Railway/Cloud hosting)
+if (!fs.existsSync(COOKIES_PATH) && process.env.YOUTUBE_COOKIES) {
+  fs.writeFileSync(COOKIES_PATH, process.env.YOUTUBE_COOKIES, 'utf-8');
+  console.log('🍪 cookies.txt created from YOUTUBE_COOKIES environment variable');
+}
+
 const hasCookies = fs.existsSync(COOKIES_PATH);
 
 const queue = new Map();
