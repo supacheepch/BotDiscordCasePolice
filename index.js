@@ -406,6 +406,9 @@ async function handlePlay(message, args) {
         channelId: voiceChannel.id,
         guildId: message.guild.id,
         adapterCreator: message.guild.voiceAdapterCreator,
+
+        selfDeaf: false,   // 🔥 สำคัญ
+        selfMute: false
       });
 
       queueContruct.connection = connection;
