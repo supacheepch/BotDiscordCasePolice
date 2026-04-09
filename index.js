@@ -3,7 +3,7 @@ require('dotenv').config();
 
 const { memberMap, preloadMembers } = require('./utils/helpers');
 const { countCase, countSelf } = require('./commands/caseStats');
-const { handlePlay, handleSkip, handleLeave } = require('./commands/music');
+const { handlePlay, handleSkip, handleLeave } = require('./commands/music_sc');
 
 // ===== CONFIG =====
 const TOKEN = process.env.DISCORD_TOKEN;
