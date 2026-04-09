@@ -2,13 +2,14 @@
 const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const { joinVoiceChannel, createAudioPlayer, createAudioResource, AudioPlayerStatus, VoiceConnectionStatus, getVoiceConnection, StreamType } = require('@discordjs/voice');
 const play = require('play-dl');
+const fs = require('fs');
 const ytdl = require('@distube/ytdl-core');
 const ExcelJS = require('exceljs');
 require('dotenv').config();
 // ===== CONFIG =====
 const TOKEN = process.env.DISCORD_TOKEN;
 
-const allowedNames = ['BaeJu', 'CasePolice', 'Boss'];
+const allowedNames = ['BaeJu', 'nifty6692', 'Boss'];
 // ===== CREATE CLIENT =====
 const client = new Client({
   intents: [
@@ -63,12 +64,30 @@ client.on('messageCreate', async (message) => {
     const args = message.content.split(' ');
     const command = args[0];
 
-    if (command === '!play') {
-      handlePlay(message, args);
-    } else if (command === '!skip') {
-      handleSkip(message);
-    } else if (command === '!leave') {
-      handleLeave(message);
+    if (command === '!help') {
+      const helpEmbed = new EmbedBuilder()
+        .setColor('#0099ff')
+        .setTitle('📋 รายการคำสั่งของบอท')
+        .setDescription('นี่คือคำสั่งทั้งหมดที่คุณสามารถใช้งานได้:')
+        .addFields(
+          { name: '📊 การจัดการเคส', value: '`!countCase` - สรุปเคสทั้งหมดในห้องนี้\n`!countSelf` - ดูสรุปเคสของตัวเอง\n`!getM` - รายชื่อสมาชิกในเซิร์ฟเวอร์' },
+          { name: '🎶 เพลง ยังใช้ไม่ได้ห้ามใช้', value: '`!play <ชื่อเพลง/ลิงก์>` - เล่นเพลงจาก YouTube\n`!skip` - ข้ามเพลงปัจจุบัน\n`!leave` - ให้บอทออกจากห้องและล้างคิว' },
+          { name: '❓ ทั่วไป', value: '`!help` - แสดงรายการคำสั่งทั้งหมด' }
+        )
+        .setFooter({ text: 'Bot Case Police' })
+        .setTimestamp();
+
+      message.channel.send({ embeds: [helpEmbed] });
+    }
+
+    if (allowedNames == message.author.username) {
+      if (command === '!play') {
+        handlePlay(message, args);
+      } else if (command === '!skip') {
+        handleSkip(message);
+      } else if (command === '!leave') {
+        handleLeave(message);
+      }
     }
   } catch (error) {
     console.error('❌ Error in messageCreate:', error);
@@ -436,16 +455,18 @@ async function handlePlay(message, args) {
 
 async function playStream(guildId, song) {
   const serverQueue = queue.get(guildId);
+
   if (!song || !song.url) {
     console.log('🏁 No more songs or invalid song object.');
-    // wait a bit before leaving if no more songs
+
     setTimeout(() => {
       const q = queue.get(guildId);
       if (q && q.songs.length === 0) {
         if (q.connection) q.connection.destroy();
         queue.delete(guildId);
       }
-    }, 30000); // 30 seconds idle
+    }, 30000);
+
     return;
   }
 
@@ -453,63 +474,92 @@ async function playStream(guildId, song) {
     console.log(`🔍 Playing stream: ${song.title} (${song.url})`);
 
     let resource;
+
     try {
-      // Try play-dl with discordPlayer optimization
+      // 🔥 ใช้ iOS + cookies (สำคัญมาก)
       const stream = await play.stream(song.url, {
         quality: 2,
         discordPlayer: true,
         extractorArgs: {
           youtube: {
-            player_client: ["IOS", "ANDROID", "WEB"]
+            player_client: ["IOS"], // 🔥 บังคับ iOS
+            cookies: fs.existsSync('./cookies.txt')
+              ? fs.readFileSync('./cookies.txt', 'utf-8')
+              : undefined
           }
         }
       });
+
       resource = createAudioResource(stream.stream, {
         inputType: stream.type,
       });
+
+      console.log('✅ Using play-dl (iOS extractor)');
+
     } catch (playDlError) {
-      console.error('⚠️ play-dl failed, trying ytdl-core fallback...', playDlError.message);
+      console.error('⚠️ play-dl failed:', playDlError.message);
 
-      // 🔥 fallback ยังใช้ได้ (บางเคส)
-      const info = await ytdl.getInfo(song.url);
-      const format = ytdl.chooseFormat(info.formats, {
-        quality: 'highestaudio',
-        filter: 'audioonly'
-      });
+      // 🔥 fallback ytdl-core (บางเคสยังรอด)
+      try {
+        const info = await ytdl.getInfo(song.url);
 
-      if (!format || !format.url) {
-        throw new Error('Failed to find any playable audio formats');
+        const format = ytdl.chooseFormat(info.formats, {
+          quality: 'highestaudio',
+          filter: 'audioonly'
+        });
+
+        if (!format || !format.url) {
+          throw new Error('No playable format');
+        }
+
+        resource = createAudioResource(format.url, {
+          inputType: StreamType.Arbitrary,
+        });
+
+        console.log('✅ Using ytdl-core fallback');
+
+      } catch (ytdlError) {
+        console.error('❌ ytdl-core failed:', ytdlError.message);
+        throw new Error('All extractors failed');
       }
-
-      resource = createAudioResource(format.url, {
-        inputType: StreamType.Arbitrary,
-      });
     }
 
+    // 🔥 play + subscribe
     serverQueue.player.play(resource);
-    serverQueue.connection.subscribe(serverQueue.player);
+
+    if (!serverQueue.connection.state.subscription) {
+      serverQueue.connection.subscribe(serverQueue.player);
+    }
 
     console.log('▶️ Audio player started.');
 
-    // Remove old listeners to avoid memory leaks and skipped songs
-    serverQueue.player.removeAllListeners(AudioPlayerStatus.Idle);
+    // 🔥 ป้องกัน listener ซ้อน
+    serverQueue.player.removeAllListeners();
+
     serverQueue.player.on(AudioPlayerStatus.Idle, () => {
       console.log('🏁 Song finished.');
       serverQueue.songs.shift();
       playStream(guildId, serverQueue.songs[0]);
     });
 
-    serverQueue.player.removeAllListeners('error');
-    serverQueue.player.on('error', error => {
+    serverQueue.player.on('error', (error) => {
       console.error(`❌ Audio Player Error: ${error.message}`);
-      serverQueue.textChannel.send(`❌ เกิดข้อผิดพลาดขณะเล่นเพลง: **${song.title}** (${error.message})`);
+
+      serverQueue.textChannel.send(
+        `❌ เพลงมีปัญหา ข้ามเพลง: **${song.title}**`
+      );
+
       serverQueue.songs.shift();
       playStream(guildId, serverQueue.songs[0]);
     });
 
   } catch (err) {
-    console.error('❌ Final Error playing stream:', err.message);
-    serverQueue.textChannel.send(`❌ ไม่สามารถเล่นเพลงได้: **${song.title}**\nสาเหตุ: ${err.message}`);
+    console.error('❌ Final Error:', err.message);
+
+    serverQueue.textChannel.send(
+      `❌ เล่นไม่ได้: **${song.title}**\nเหตุผล: ${err.message}`
+    );
+
     serverQueue.songs.shift();
     playStream(guildId, serverQueue.songs[0]);
   }
