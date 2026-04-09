@@ -171,6 +171,9 @@ async function playStream(guildId, song) {
         noWarnings: true,
         noCheckCertificate: true,
         output: '-',   // pipe audio to stdout
+        // บังคับใช้ iOS player client เพื่อข้าม YouTube Bot Check บน Datacenter IP
+        extractorArgs: 'youtube:player_client=ios,web_safari,web',
+        addHeaders: 'User-Agent:Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
       };
 
       // ถ้ามี cookies.txt ให้แนบไปด้วยเพื่อแก้ปัญหา YouTube Block
